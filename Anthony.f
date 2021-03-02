@@ -161,7 +161,9 @@ c****************************************COMPUTE REORDER
         STOCKARR(K) = TEMPSTOCKVAR - ORDERED
         IF(STOCKARR(K) .LE. REORDERPOINTARR(K)) Then
             TEMPREORDVAR = REORDERPOINTARR(K)    
-            IF(TEMPREORDVAR .EQ. 1) Then    
+            IF (TEMPREORDVAR .GT. 20) Then
+                REORDERAMOUNT = 30 - STOCKARR(K)
+            ELSE
                 REORDERAMOUNT = REORDERPOINTARR(K) - STOCKARR(K)
             END IF
         END IF
