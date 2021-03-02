@@ -43,7 +43,7 @@ c*******************************************************************************
 c*  Input product information from inventory.dat to arrays of product id, 
 c*  product name, stock availability, reorder point, and price
         OPEN(UNIT=1, FILE='inventory.dat', STATUS='OLD')
-        OPEN(UNIT=10, FILE='inventoryInput.dat', STATUS='OLD')
+c        OPEN(UNIT=10, FILE='inventoryInput.dat', STATUS='OLD')
         I = 1
 100     READ(1, 120, IOSTAT=IVAL)PID, PNAME, STOCK, REORDERPOINT, PRICE
         IF(IVAL) 199, 110, 199
@@ -67,7 +67,7 @@ c*  Input customer information from customer.dat to arrays of customer id,
 c*  customer name, customer street address, customer city,
 c*  customer state or country, debt
         OPEN(UNIT=2, FILE='customers.dat', STATUS='OLD')
-        OPEN(UNIT=20, FILE='customersInput.dat', STATUS='OLD')
+c        OPEN(UNIT=20, FILE='customersInput.dat', STATUS='OLD')
         J = 1
 200     READ(2, 220, IOSTAT=IVAL)CID,CNAME,STREET,CITY,STATECOUNTRY,DEBT
         IF(IVAL) 299, 210, 299
@@ -156,22 +156,38 @@ c********************COMPUTE GROSS COST, DISCOUNT, NET COST COMPLETED
 
 
 c****************************************COMPUTE REORDER
-        OPEN(UNIT=11, FILE='INVENTORYORDERS.DAT', STATUS='OLD')
-        TEMPSTOCKVAR = STOCKARR(K)        
-        STOCKARR(K) = TEMPSTOCKVAR - ORDERED
-        IF(STOCKARR(K) .LE. REORDERPOINTARR(K)) Then
-            TEMPREORDVAR = REORDERPOINTARR(K)    
-            IF (TEMPREORDVAR .GT. 20) Then
-                REORDERAMOUNT = 30 - STOCKARR(K)
+        OPEN(UNIT=11, FILE='TransactionsProcessed.dat', STATUS='OLD')
+        OPEN(UNIT=12, FILE='InventoryOrders.dat', STATUS='OLD')
+        TEMPSTOCKVAR = STOCKARR(L)        
+        STOCKARR(L) = TEMPSTOCKVAR - ORDERED
+        IF(STOCKARR(L) .LE. REORDERPOINTARR(L)) Then
+            TEMPREORDVAR = REORDERPOINTARR(L)    
+c*          If reorder point is 1,    have 3 in stock
+c*          '                ' 2-5,   have 6 in stock
+c*          '                ' 6-10,  have 12 in stock
+c*          '                ' 11-20, have 25 in stock
+c*          otherwise,                have 30 in stock
+            IF (TEMPREORDVAR .EQ. 1) THEN
+                REORDERAMOUNT = 3 - STOCKARR(L)
+            ELSE IF (TEMPREORDVAR .LE. 5) THEN
+                REORDERAMOUNT = 6 - STOCKARR(L)
+            ELSE IF (TEMPREORDVAR .LE. 10) THEN
+                REORDERAMOUNT = 12 - STOCKARR(L)
+            ELSE IF (TEMPREORDVAR .LE. 20) THEN
+                REORDERAMOUNT = 25 - STOCKARR(L)
             ELSE
-                REORDERAMOUNT = REORDERPOINTARR(K) - STOCKARR(K)
+                REORDERAMOUNT = 30 - STOCKARR(L)
+            END IF
+            IF (REORDERAMOUNT .GT. 0) THEN
+                WRITE(12,420)PIDARR(L), REORDERAMOUNT
             END IF
         END IF
         WRITE(11,410)CNAMEARR(K),STREETARR(K), CITYARR(K),
      &  STATECOUNTRYARR(K),PNAMEARR(L), ORDERED, GROSS,
-     &  DISCOUNT, NET, DEBTARR(K)            
+     &  DISCOUNT, NET, DEBTARR(K)      
 410     FORMAT(A23, 1x, A23, 1x, A13, 1x, A12, 1x, A25, 1x, I2,
      &  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2, 1x)
+420     FORMAT(I6.6, 1x, I2)
 
 c*******************************************COMPUTE REORDER COMPLETED
         GO TO 300
