@@ -156,18 +156,20 @@ c********************COMPUTE GROSS COST, DISCOUNT, NET COST COMPLETED
 
 
 c****************************************COMPUTE REORDER
-c*        OPEN(UNIT=11, FILE='INVENTORYORDERS.DAT', STATUS='OLD')
-c*        TEMPSTOCKVAR = STOCKARR(K)        
-c*        STOCKARR(K) = TEMPSTOCKVAR - ORDERED
-c*        IF(STCKARR(K) .LE. REORDERPOINTARR(K)) Then
-c*            TEMPREORDVAR = REORDERPOINTARR(K)    
-c*            IF(TEMPREORDVAR .EQ. 1)    
-c*                REORDERAMOUNT = REORDERPOINTARR(K) - STOCKARR(K)
-c*        WRITE(11,410)CNAMEARR(K),STREETARR(K), CITYARR(K),
-c*     &  STATECOUNTRYARR(K),PNAMEARR(L), ORDERED, GROSS,
-c*     &  DISCOUNT, NET, DEBTARR(K)            
-c*410     FORMAT(A23, 1x, A23, 1x, A13, 1x, A12, 1x, A25, 1x, A3,
-c*     &  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2, 1x,)
+        OPEN(UNIT=11, FILE='INVENTORYORDERS.DAT', STATUS='OLD')
+        TEMPSTOCKVAR = STOCKARR(K)        
+        STOCKARR(K) = TEMPSTOCKVAR - ORDERED
+        IF(STOCKARR(K) .LE. REORDERPOINTARR(K)) Then
+            TEMPREORDVAR = REORDERPOINTARR(K)    
+            IF(TEMPREORDVAR .EQ. 1) Then    
+                REORDERAMOUNT = REORDERPOINTARR(K) - STOCKARR(K)
+            END IF
+        END IF
+        WRITE(11,410)CNAMEARR(K),STREETARR(K), CITYARR(K),
+     &  STATECOUNTRYARR(K),PNAMEARR(L), ORDERED, GROSS,
+     &  DISCOUNT, NET, DEBTARR(K)            
+410     FORMAT(A23, 1x, A23, 1x, A13, 1x, A12, 1x, A25, 1x, I2,
+     &  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2, 1x)
 
 c*******************************************COMPUTE REORDER COMPLETED
         GO TO 300
