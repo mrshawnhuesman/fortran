@@ -1,7 +1,7 @@
 c************************************************************************************
 c*          CSC 407/507 Programming Assignment #2: The OLDE Language Assignment
 c*                                 Fortran Group Project   
-c*                written by: Anthony J. Bosch, Shawn C. Huesman, Wie L. Sie 
+c*               written by: Anthony J. Bosch, Shawn C. Huesman, Wie L. Sie 
 c************************************************************************************
 c*
 c*  This program will process customer transaction
@@ -18,21 +18,25 @@ c*******************************************************************************
 
 c************************************************************************************
 c*	                               Declare Variables
-PROGRAM X
+
         INTEGER       PID, STOCK, REORDERPOINT, I, PIDARR(24)
         INTEGER       STOCKARR(24)
         INTEGER       REORDERPOINTARR(24)
         CHARACTER*24  PNAME, PNAMEARR(24)
-        REAL		  PRICE, PRICEARR(24)
+        REAL          PRICE, PRICEARR(24)
 
         INTEGER       CID, J, CIDARR(10)
         CHARACTER*24  CNAME, STREET, CITY, STATECOUNTRY
         CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
         CHARACTER*24  STATECOUNTRYARR(10)
-        REAL		  DEBT, DEBTARR(10)
+        REAL	      DEBT, DEBTARR(10)
      
         INTEGER       ORDERED
-        CHARACTER     SALECODE         
+        CHARACTER     SALECODE
+
+        REAL          GROSS, NET, DISCOUNT
+
+        INTEGER       REORDERAMOUNT, TEMPSTOCKVAR, TEMPREORDVAR           
 c************************************************************************************
 
 c************************************************************************************
@@ -51,8 +55,8 @@ c*  product name, stock availability, reorder point, and price
             PRICEARR(I) = PRICE
             I = I + 1
 
-120     FORMAT(I10, A25, I7, I7, F5.2)
-130     FORMAT(I6.6, 4x, A25, 1x, I2.2, 5x, I2.2, 5x, F5.2)
+120     FORMAT(I10, A25, I7, I7, F6.2)
+130     FORMAT(I6.6, 4x, A25, 1x, I2.2, 5x, I2.2, 5x, F6.2)
         GO TO 100
 199     I = 1
         CLOSE(UNIT=1, STATUS='KEEP')
@@ -86,21 +90,91 @@ c*******************************************************************************
 
 
 c************************************************************************************
-c*  Processing transaction
-        OPEN(UNIT=3, FILE='transaction.dat', STATUS='OLD')
-        OPEN(UNIT=10, FILE='ERROR.DAT', STATUS='NEW')
+c**************************  Processing transaction  ********************************
+
+c**************************GENERATE ERROR REPORT
+        OPEN(UNIT=3, FILE='transactions.dat', STATUS='OLD')
+        OPEN(UNIT=10, FILE='ERROR.DAT', STATUS='OLD')
+
         K = 1
 300     READ(3, 320, IOSTAT=IVAL)CID,PID,ORDERED,SALECODE
-        IF(IVAL)399,389,399
-389         DO 500 I = 1, 10
-c*            IF(CIDARG .EQ. CIDARR(I)) Then
-c*                GO TO 599
-c*            ENDIF
-            CALL ISVALIDPRODUCT(CID, PID, ORDERED)
-320     FORMAT(I10, I12, A6, A1)
+        
+        IF(IVAL)399,301,399
+
+301         DO 302 K = 1, 10
+                IF(CID .EQ. CIDARR(K)) Then
+                    GO TO 303
+                END IF
+302         CONTINUE
+
+305     WRITE (10, 330)CID, PID, ORDERED
+        GO TO 300
+
+303         DO 304 L = 1, 24
+                IF(PID .EQ. PIDARR(L)) Then
+                    GO TO 310
+                END IF       
+304         CONTINUE
+        WRITE (10, 340)CID, PID, ORDERED
+        GO TO 300        
+            
+320     FORMAT(I10, I12, I6, A1)
+330     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID CUSTOMER NUMBER')
+340     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID PRODUCT NUMBER')   
+c**************************GENERATE ERROR REPORT COMPLETED
+
+310     WRITE(*,*)'CALCULATING GROSS COST, DISCOUNT, NET COST, ETC'
+
+*************************COMPUTE GROSS COST, DISCOUNT, NET COST
+        GROSS = ORDERED * PRICEARR(L)
+  
+370     FORMAT(I3, 1x, F6.2, 1x, F6.2)
+
+        IF (SALECODE .EQ. 'A') Then
+            NET = GROSS * 90/100
+        ELSE IF (SALECODE .EQ. 'B') Then
+            NET = GROSS * 80/100
+        ELSE IF (SALECODE .EQ. 'C') Then
+            NET = GROSS * 75/100
+        ELSE IF (SALECODE .EQ. 'D') Then
+            NET = (ORDERED - INT (ORDERED/3)) * PRICEARR(L)
+        ELSE IF (SALECODE .EQ. 'E') Then
+            IF (ORDERED .EQ. 1) Then
+                NET = PRICEARR(L)
+            ELSE                
+                NET = (ORDERED - INT (ORDERED/2)) * PRICEARR(L)
+            END IF     
+        ELSE IF (SALECODE .EQ. 'Z') Then
+            NET = GROSS    
+        END IF
+        DISCOUNT = GROSS - NET
+          
+        DEBTARR(K) = DEBTARR(K) + NET
+        WRITE(*,*)ORDERED, PRICEARR(L), GROSS, DISCOUNT, NET,
+     +  DEBTARR(K)    
+c********************COMPUTE GROSS COST, DISCOUNT, NET COST COMPLETED
+
+
+c****************************************COMPUTE REORDER
+c*        OPEN(UNIT=11, FILE='INVENTORYORDERS.DAT', STATUS='OLD')
+c*        TEMPSTOCKVAR = STOCKARR(K)        
+c*        STOCKARR(K) = TEMPSTOCKVAR - ORDERED
+c*        IF(STCKARR(K) .LE. REORDERPOINTARR(K)) Then
+c*            TEMPREORDVAR = REORDERPOINTARR(K)    
+c*            IF(TEMPREORDVAR .EQ. 1)    
+c*                REORDERAMOUNT = REORDERPOINTARR(K) - STOCKARR(K)
+c*        WRITE(11,410)CNAMEARR(K),STREETARR(K), CITYARR(K),
+c*     &  STATECOUNTRYARR(K),PNAMEARR(L), ORDERED, GROSS,
+c*     &  DISCOUNT, NET, DEBTARR(K)            
+c*410     FORMAT(A23, 1x, A23, 1x, A13, 1x, A12, 1x, A25, 1x, A3,
+c*     &  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2, 1x,)
+
+c*******************************************COMPUTE REORDER COMPLETED
+        GO TO 300
 399     CLOSE(UNIT=3, STATUS='KEEP')
 
-500     CONTINUE
+
+
 c************************************************************************************
 
 
