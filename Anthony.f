@@ -15,33 +15,17 @@ c*  There are 3 output files will be generated:
 c*  transactions processed, inventory orders, errors
 c*
 c************************************************************************************
-
-c************************************************************************************
-c*	                               Declare Variables
-
-        INTEGER       PID, STOCK, REORDERPOINT, I, PIDARR(24)
-        INTEGER       STOCKARR(24)
-        INTEGER       REORDERPOINTARR(24)
-        CHARACTER*24  PNAME, PNAMEARR(24)
-        REAL          PRICE, PRICEARR(24)
-
-        INTEGER       CID, J, CIDARR(10)
-        CHARACTER*24  CNAME, STREET, CITY, STATECOUNTRY
-        CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
-        CHARACTER*24  STATECOUNTRYARR(10)
-        REAL	      DEBT, DEBTARR(10)
-     
-        INTEGER       ORDERED
-        CHARACTER     SALECODE
-
-        REAL          GROSS, NET, DISCOUNT
-
-        INTEGER       REORDERAMOUNT, TEMPSTOCKVAR, TEMPREORDVAR           
-c************************************************************************************
-
-c************************************************************************************
 c*  Input product information from inventory.dat to arrays of product id, 
 c*  product name, stock availability, reorder point, and price
+        SUBROUTINE GETINVENTORY(PIDARR, STOCKARR, REORDERPOINTARR, 
+     +  PNAMEARR, PRICEARR)
+        INTEGER       PIDARR(24), STOCKARR(24), REORDERPOINTARR(24)
+        CHARACTER*24  PNAMEARR(24)
+        REAL          PRICEARR(24)
+
+        INTEGER       PID, STOCK, REORDERPOINT, I
+        CHARACTER*24  PNAME
+        REAL          PRICE
         OPEN(UNIT=1, FILE='inventory.dat', STATUS='OLD')
 c        OPEN(UNIT=10, FILE='inventoryInput.dat', STATUS='OLD')
         I = 1
@@ -60,19 +44,28 @@ c        OPEN(UNIT=10, FILE='inventoryInput.dat', STATUS='OLD')
         GO TO 100
 199     I = 1
         CLOSE(UNIT=1, STATUS='KEEP')
-c************************************************************************************
+        END SUBROUTINE
 
-c************************************************************************************
 c*  Input customer information from customer.dat to arrays of customer id,
 c*  customer name, customer street address, customer city,
 c*  customer state or country, debt
+        SUBROUTINE GETCUSTOMERS(CIDARR, CNAMEARR, STREETARR, CITYARR, 
+     +  STATECOUNTRYARR, DEBTARR)
+        INTEGER       CIDARR(10)
+        CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
+        CHARACTER*24  STATECOUNTRYARR(10)
+        REAL	      DEBTARR(10)
+
+        INTEGER       CID, J
+        CHARACTER*24  CNAME, STREET, CITY, STATECOUNTRY
+        REAL          DEBT
         OPEN(UNIT=2, FILE='customers.dat', STATUS='OLD')
-c        OPEN(UNIT=20, FILE='customersInput.dat', STATUS='OLD')
+
         J = 1
 200     READ(2, 220, IOSTAT=IVAL)CID,CNAME,STREET,CITY,STATECOUNTRY,DEBT
         IF(IVAL) 299, 210, 299
 210         WRITE(*,230)CID,CNAME,STREET,CITY,
-     &          STATECOUNTRY,DEBT
+     +          STATECOUNTRY,DEBT
             CIDARR(J) = CID
             CNAMEARR(J) = CNAME
             STREETARR(J) = STREET
@@ -86,23 +79,41 @@ c        OPEN(UNIT=20, FILE='customersInput.dat', STATUS='OLD')
         GO TO 200
 299     J = 1     
         CLOSE(UNIT=2, STATUS='KEEP')
-c************************************************************************************
+        END SUBROUTINE
 
+c*      Input transaction from transactions.dat.
+c*
+c*      Compute error file if product id or customer id is invalid.
+c*
+c*      Process transactions and compute gross sale amount, net sale
+c*      amount, discount applied, and debt owed after each transaction
+c*      
+c*      Find amount of inventory to reorder after transactions using
+c*      stock left and reorder point
+        SUBROUTINE PROCESSTRANSACTIONS(PIDARR, CIDARR, STOCKARR,
+     +  REORDERPOINTARR, PRICEARR, DEBTARR, CNAMEARR,
+     +  STREETARR, CITYARR, PNAMEARR, STATECOUNTRYARR)
+        INTEGER       PIDARR(24), CIDARR(10), STOCKARR(24)
+        INTEGER       REORDERPOINTARR(24)
+        REAL          PRICEARR(24), DEBTARR(10)
+        CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
+        CHARACTER*24  PNAMEARR(24)
+        CHARACTER*24  STATECOUNTRYARR(10)
 
-c************************************************************************************
-c**************************  Processing transaction  ********************************
-
-c**************************GENERATE ERROR REPORT
+        INTEGER       CID, PID, ORDERED, REORDERAMOUNT
+        CHARACTER     SALECODE
+        REAL          GROSS, NET, DISCOUNT
         OPEN(UNIT=3, FILE='transactions.dat', STATUS='OLD')
         OPEN(UNIT=10, FILE='ERROR.DAT', STATUS='OLD')
+        OPEN(UNIT=11, FILE='TransactionsProcessed.dat', STATUS='OLD')
+        OPEN(UNIT=12, FILE='InventoryOrders.dat', STATUS='OLD')
 
-        K = 1
 300     READ(3, 320, IOSTAT=IVAL)CID,PID,ORDERED,SALECODE
-        
         IF(IVAL)399,301,399
-
+        
 301         DO 302 K = 1, 10
                 IF(CID .EQ. CIDARR(K)) Then
+c*                  Valid customer id, check if product id is valid
                     GO TO 303
                 END IF
 302         CONTINUE
@@ -112,22 +123,20 @@ c**************************GENERATE ERROR REPORT
 
 303         DO 304 L = 1, 24
                 IF(PID .EQ. PIDARR(L)) Then
-                    GO TO 310
+c*                  valid product id, continue transactio
+                    GO TO 405
                 END IF       
 304         CONTINUE
-        WRITE (10, 340)CID, PID, ORDERED
+
+315     WRITE (10, 340)CID, PID, ORDERED
         GO TO 300        
             
 320     FORMAT(I10, I12, I6, A1)
 330     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID CUSTOMER NUMBER')
-340     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID PRODUCT NUMBER')   
-c**************************GENERATE ERROR REPORT COMPLETED
+340     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID PRODUCT NUMBER')
 
-310     WRITE(*,*)'CALCULATING GROSS COST, DISCOUNT, NET COST, ETC'
+405     GROSS = ORDERED * PRICEARR(L)
 
-*************************COMPUTE GROSS COST, DISCOUNT, NET COST
-        GROSS = ORDERED * PRICEARR(L)
-  
 370     FORMAT(I3, 1x, F6.2, 1x, F6.2)
 
         IF (SALECODE .EQ. 'A') Then
@@ -150,14 +159,14 @@ c**************************GENERATE ERROR REPORT COMPLETED
         DISCOUNT = GROSS - NET
           
         DEBTARR(K) = DEBTARR(K) + NET
-        WRITE(*,*)ORDERED, PRICEARR(L), GROSS, DISCOUNT, NET,
-     +  DEBTARR(K)    
-c********************COMPUTE GROSS COST, DISCOUNT, NET COST COMPLETED
 
+        WRITE(11,410)CNAMEARR(K),STREETARR(K), CITYARR(K),
+     +  STATECOUNTRYARR(K),PNAMEARR(L), ORDERED, GROSS,
+     +  DISCOUNT, NET, DEBTARR(K)
 
-c****************************************COMPUTE REORDER
-        OPEN(UNIT=11, FILE='TransactionsProcessed.dat', STATUS='OLD')
-        OPEN(UNIT=12, FILE='InventoryOrders.dat', STATUS='OLD')
+410     FORMAT(A23, 1x, A23, 1x, A13, 1x, A12, 1x, A25, 1x, I2,
+     +  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2, 1x)
+
         TEMPSTOCKVAR = STOCKARR(L)        
         STOCKARR(L) = TEMPSTOCKVAR - ORDERED
         IF(STOCKARR(L) .LE. REORDERPOINTARR(L)) Then
@@ -182,21 +191,42 @@ c*          otherwise,                have 30 in stock
                 WRITE(12,420)PIDARR(L), REORDERAMOUNT
             END IF
         END IF
-        WRITE(11,410)CNAMEARR(K),STREETARR(K), CITYARR(K),
-     &  STATECOUNTRYARR(K),PNAMEARR(L), ORDERED, GROSS,
-     &  DISCOUNT, NET, DEBTARR(K)      
-410     FORMAT(A23, 1x, A23, 1x, A13, 1x, A12, 1x, A25, 1x, I2,
-     &  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2, 1x)
-420     FORMAT(I6.6, 1x, I2)
 
-c*******************************************COMPUTE REORDER COMPLETED
+420     FORMAT(I6.6, 1x, I2)
         GO TO 300
 399     CLOSE(UNIT=3, STATUS='KEEP')
+        CLOSE(UNIT=10, STATUS='KEEP')
+        CLOSE(UNIT=11, STATUS='KEEP')
+        CLOSE(UNIT=12, STATUS='KEEP')
+        END SUBROUTINE
 
 
+        PROGRAM ANTHONY
+        INTEGER       PID, STOCK, REORDERPOINT, I, PIDARR(24)
+        INTEGER       STOCKARR(24)
+        INTEGER       REORDERPOINTARR(24)
+        CHARACTER*24  PNAME, PNAMEARR(24)
+        REAL          PRICE, PRICEARR(24)
 
-c************************************************************************************
+        INTEGER       CID, J, CIDARR(10)
+        CHARACTER*24  CNAME, STREET, CITY, STATECOUNTRY
+        CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
+        CHARACTER*24  STATECOUNTRYARR(10)
+        REAL	      DEBT, DEBTARR(10)
 
+        INTEGER       ORDERED
+        CHARACTER     SALECODE
+        REAL          GROSS, NET, DISCOUNT
+        INTEGER       REORDERAMOUNT, TEMPSTOCKVAR, TEMPREORDVAR           
+
+        CALL GETINVENTORY(PIDARR, STOCKARR, REORDERPOINTARR, 
+     +  PNAMEARR, PRICEARR)
+        CALL GETCUSTOMERS(CIDARR, CNAMEARR, STREETARR, CITYARR, 
+     +  STATECOUNTRYARR, DEBTARR)
+        CALL PROCESSTRANSACTIONS(PIDARR, CIDARR, STOCKARR,
+     +  REORDERPOINTARR, PRICEARR, DEBTARR, CNAMEARR,
+     +  STREETARR, CITYARR, PNAMEARR, STATECOUNTRYARR)
+        END PROGRAM
 
 c************************************************************************************
 c* check if acustomer number is valid or not
@@ -217,9 +247,20 @@ c*510     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x)
 c*599     RETURN
 c*        END
 c************************************************************************************
-
-
-c********************************* PROGRAM END **************************************
-
-        STOP
-        END
+c*  SUBROUTINE ISVALIDID(ID, IDARR, ARRSIZE, *, *)
+c*          Check if a customer id or product id is valid
+c*          Return default if valid and return on second dummy param if invalid
+c*            INTEGER ID
+c*            INTEGER ARRSIZE
+c*            INTEGER IDARR(ARRSIZE)
+c*
+c*            INTEGER I
+c*            
+c*            DO 1000 I = 1, ARRSIZE
+c*                IF(ID .EQ. IDARR(I)) THEN
+c*                    RETURN
+c*                END IF
+c*1000        CONTINUE
+c*            RETURN 1
+c*        END SUBROUTINE
+C************************************************************************************
