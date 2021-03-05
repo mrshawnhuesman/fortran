@@ -15,8 +15,48 @@ c*  There are 3 output files will be generated:
 c*  transactions processed, inventory orders, errors
 c*
 c************************************************************************************
-c*  Input product information from inventory.dat to arrays of product id, 
-c*  product name, stock availability, reorder point, and price
+
+c************************************************************************************
+c*      This is the main part of the program
+c*      Declares the program variables
+c*      and call subroutines that will do the computations for processing transactions
+c*      such as discount, reorder amount, etc
+c*      and the subroutines will output error report, ordering report,
+c*      and transactions processed report
+
+        PROGRAM ANTHONY
+        INTEGER       PID, STOCK, REORDERPOINT, I, PIDARR(24)
+        INTEGER       STOCKARR(24)
+        INTEGER       REORDERPOINTARR(24)
+        CHARACTER*24  PNAME, PNAMEARR(24)
+        REAL          PRICE, PRICEARR(24)
+
+        INTEGER       CID, J, CIDARR(10)
+        CHARACTER*24  CNAME, STREET, CITY, STATECOUNTRY
+        CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
+        CHARACTER*24  STATECOUNTRYARR(10)
+        REAL	      DEBT, DEBTARR(10)
+
+        INTEGER       ORDERED
+        CHARACTER     SALECODE
+        REAL          GROSS, NET, DISCOUNT
+        INTEGER       REORDERAMOUNT, TEMPSTOCKVAR         
+
+        CALL GETINVENTORY(PIDARR, STOCKARR, REORDERPOINTARR, 
+     +  PNAMEARR, PRICEARR)
+        CALL GETCUSTOMERS(CIDARR, CNAMEARR, STREETARR, CITYARR, 
+     +  STATECOUNTRYARR, DEBTARR)
+        CALL PROCESSTRANSACTIONS(PIDARR, CIDARR, STOCKARR,
+     +  REORDERPOINTARR, PRICEARR, DEBTARR, CNAMEARR,
+     +  STREETARR, CITYARR, PNAMEARR, STATECOUNTRYARR)
+        END PROGRAM
+c************************************************************************************
+
+c************************************************************************************
+c*      GETINVENTORY subroutine that will read inventory file input and store data 
+c*      into separate arrays :
+c*      Input product information from inventory.dat to arrays of product id, 
+c*      product name, stock availability, reorder point, and price
         SUBROUTINE GETINVENTORY(PIDARR, STOCKARR, REORDERPOINTARR, 
      +  PNAMEARR, PRICEARR)
         INTEGER       PIDARR(24), STOCKARR(24), REORDERPOINTARR(24)
@@ -27,12 +67,10 @@ c*  product name, stock availability, reorder point, and price
         CHARACTER*24  PNAME
         REAL          PRICE
         OPEN(UNIT=1, FILE='inventory.dat', STATUS='OLD')
-c        OPEN(UNIT=10, FILE='inventoryInput.dat', STATUS='OLD')
         I = 1
 100     READ(1, 120, IOSTAT=IVAL)PID, PNAME, STOCK, REORDERPOINT, PRICE
         IF(IVAL) 199, 110, 199
-110         WRITE(*,130)PID, PNAME, STOCK, REORDERPOINT, PRICE
-            PIDARR(I) = PID
+110         PIDARR(I) = PID
             PNAMEARR(I) = PNAME
             STOCKARR(I) = STOCK
             REORDERPOINTARR(I) = REORDERPOINT
@@ -40,15 +78,19 @@ c        OPEN(UNIT=10, FILE='inventoryInput.dat', STATUS='OLD')
             I = I + 1
 
 120     FORMAT(I10, A25, I7, I7, F6.2)
-130     FORMAT(I6.6, 4x, A25, 1x, I2.2, 5x, I2.2, 5x, F6.2)
+
         GO TO 100
 199     I = 1
         CLOSE(UNIT=1, STATUS='KEEP')
         END SUBROUTINE
+c************************************************************************************
 
-c*  Input customer information from customer.dat to arrays of customer id,
-c*  customer name, customer street address, customer city,
-c*  customer state or country, debt
+c************************************************************************************
+c*      GETCUSTOMERS subroutine that will read customer file input and store data 
+c*      into separate arrays :
+c*      Input customer information from customer.dat to arrays of customer id,
+c*      customer name, customer street address, customer city,
+c*      customer state or country, debt
         SUBROUTINE GETCUSTOMERS(CIDARR, CNAMEARR, STREETARR, CITYARR, 
      +  STATECOUNTRYARR, DEBTARR)
         INTEGER       CIDARR(10)
@@ -64,9 +106,7 @@ c*  customer state or country, debt
         J = 1
 200     READ(2, 220, IOSTAT=IVAL)CID,CNAME,STREET,CITY,STATECOUNTRY,DEBT
         IF(IVAL) 299, 210, 299
-210         WRITE(*,230)CID,CNAME,STREET,CITY,
-     +          STATECOUNTRY,DEBT
-            CIDARR(J) = CID
+210         CIDARR(J) = CID
             CNAMEARR(J) = CNAME
             STREETARR(J) = STREET
             CITYARR(J) = CITY
@@ -75,24 +115,25 @@ c*  customer state or country, debt
             J = J + 1
 
 220     FORMAT(I10, A23, A23, A13, A12, F6.2)
-230     FORMAT(I5.5, 4x, A23, 1x, A23, 1x, A13, 1x, A12, 1x, F6.2)
+
         GO TO 200
 299     J = 1     
         CLOSE(UNIT=2, STATUS='KEEP')
         END SUBROUTINE
+c************************************************************************************
 
-c*      Input transaction from transactions.dat.
+c************************************************************************************
+c*      PROCESSTRANSACTIONS subroutine that will read transaction file input,
+c*      store data into separate arrays, and perform computations :
 c*
 c*      Compute error file if product id or customer id is invalid.
-c*
-c*      Process transactions and compute gross sale amount, net sale
-c*      amount, discount applied, and debt owed after each transaction
-c*      
-c*      Find amount of inventory to reorder after transactions using
-c*      stock left and reorder point
+c*         
+c*      and call CALCULATEDISCOUNT subroutine if product id or customer id is valid
+
         SUBROUTINE PROCESSTRANSACTIONS(PIDARR, CIDARR, STOCKARR,
      +  REORDERPOINTARR, PRICEARR, DEBTARR, CNAMEARR,
      +  STREETARR, CITYARR, PNAMEARR, STATECOUNTRYARR)
+
         INTEGER       PIDARR(24), CIDARR(10), STOCKARR(24)
         INTEGER       REORDERPOINTARR(24)
         REAL          PRICEARR(24), DEBTARR(10)
@@ -100,18 +141,18 @@ c*      stock left and reorder point
         CHARACTER*24  PNAMEARR(24)
         CHARACTER*24  STATECOUNTRYARR(10)
 
-        INTEGER       CID, PID, ORDERED, REORDERAMOUNT
+        INTEGER       CID, PID, ORDERED, K, L
         CHARACTER     SALECODE
-        REAL          GROSS, NET, DISCOUNT
+        
         OPEN(UNIT=3, FILE='transactions.dat', STATUS='OLD')
-        OPEN(UNIT=10, FILE='ERROR.DAT', STATUS='OLD')
-        OPEN(UNIT=11, FILE='TransactionsProcessed.dat', STATUS='OLD')
-        OPEN(UNIT=12, FILE='InventoryOrders.dat', STATUS='OLD')
-
+        OPEN(UNIT=10, FILE='ERROR.DAT', STATUS='NEW')
+        OPEN(UNIT=11, FILE='TransactionsProcessed.dat', STATUS='NEW')
+        OPEN(UNIT=12, FILE='InventoryOrders.dat', STATUS='NEW')
+     
 300     READ(3, 320, IOSTAT=IVAL)CID,PID,ORDERED,SALECODE
         IF(IVAL)399,301,399
         
-301         DO 302 K = 1, 10
+301         DO 302 K = 1, size(CIDARR)
                 IF(CID .EQ. CIDARR(K)) Then
 c*                  Valid customer id, check if product id is valid
                     GO TO 303
@@ -121,10 +162,14 @@ c*                  Valid customer id, check if product id is valid
 305     WRITE (10, 330)CID, PID, ORDERED
         GO TO 300
 
-303         DO 304 L = 1, 24
+303         DO 304 L = 1, size(PIDARR)
                 IF(PID .EQ. PIDARR(L)) Then
-c*                  valid product id, continue transactio
-                    GO TO 405
+c*                  Valid product id, continue transaction
+                    CALL CALCULATEDISCOUNT(PIDARR, STOCKARR,
+     +              REORDERPOINTARR, PRICEARR, DEBTARR, CNAMEARR,
+     +              STREETARR, CITYARR, PNAMEARR, STATECOUNTRYARR,
+     +              ORDERED, SALECODE, K, L)        
+                    GO TO 300
                 END IF       
 304         CONTINUE
 
@@ -132,12 +177,45 @@ c*                  valid product id, continue transactio
         GO TO 300        
             
 320     FORMAT(I10, I12, I6, A1)
-330     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID CUSTOMER NUMBER')
-340     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID PRODUCT NUMBER')
+330     FORMAT(I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID CUSTOMER NUMBER')
+340     FORMAT(I5.5, 4x, I6.6, 4x, I2, 2x, 'INVALID PRODUCT NUMBER')
+399     CLOSE(UNIT=3, STATUS='KEEP')
+        CLOSE(UNIT=10, STATUS='KEEP')
+        CLOSE(UNIT=11, STATUS='KEEP')
+        CLOSE(UNIT=12, STATUS='KEEP')        
+        END SUBROUTINE
+c************************************************************************************
 
+c************************************************************************************
+c*      CALCULATEDISCOUNT subroutine perform computations :
+c*
+c*      Process transactions and compute gross sale amount, net sale
+c*      amount, discount applied, and debt owed after each transaction.
+c*     
+c*      and output results to the transactions processed file
+c*      also call OUTPUTORDER subroutine that will
+c*      find amount of inventory to reorder after transactions using
+c*      stock left and reorder point,
+
+
+        SUBROUTINE CALCULATEDISCOUNT(PIDARR, STOCKARR,
+     +  REORDERPOINTARR, PRICEARR, DEBTARR, CNAMEARR,
+     +  STREETARR, CITYARR, PNAMEARR, STATECOUNTRYARR,
+     +  ORDERED, SALECODE, K, L)
+
+        INTEGER       PIDARR(24), STOCKARR(24)
+        INTEGER       REORDERPOINTARR(24)        
+        REAL          PRICEARR(24), DEBTARR(10)
+        CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
+        CHARACTER*24  PNAMEARR(24)
+        CHARACTER*24  STATECOUNTRYARR(10)
+        INTEGER       K, L  
+
+        INTEGER       ORDERED, REORDERAMOUNT
+        CHARACTER     SALECODE
+        REAL          NET, DISCOUNT
+   
 405     GROSS = ORDERED * PRICEARR(L)
-
-370     FORMAT(I3, 1x, F6.2, 1x, F6.2)
 
         IF (SALECODE .EQ. 'A') Then
             NET = GROSS * 90/100
@@ -165,8 +243,28 @@ c*                  valid product id, continue transactio
      +  DISCOUNT, NET, DEBTARR(K)
 
 410     FORMAT(A23, 1x, A23, 1x, A13, 1x, A12, 1x, A25, 1x, I2,
-     +  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2, 1x)
+     +  1x, F6.2, 1x, F6.2, 1x, F6.2, 1x, F6.2)
 
+        CALL OUTPUTORDER (PIDARR, STOCKARR,
+     +  REORDERPOINTARR, ORDERED, L)        
+        END SUBROUTINE
+c************************************************************************************
+        
+c************************************************************************************
+c*      OUTPUTORDER subroutine perform computations :
+c*      
+c*      Calculate the quantity that need to be reordered based on
+c       reorderpoint after process transaction 
+c*      
+        SUBROUTINE OUTPUTORDER(PIDARR, STOCKARR,
+     +  REORDERPOINTARR, ORDERED, L)
+
+        INTEGER       PIDARR(24), STOCKARR(24)
+        INTEGER       REORDERPOINTARR(24)        
+        INTEGER       ORDERED, L
+
+        INTEGER       REORDERAMOUNT, TEMPSTOCKVAR
+        INTEGER       TEMPREORDVAR    
         TEMPSTOCKVAR = STOCKARR(L)        
         STOCKARR(L) = TEMPSTOCKVAR - ORDERED
         IF(STOCKARR(L) .LE. REORDERPOINTARR(L)) Then
@@ -191,76 +289,6 @@ c*          otherwise,                have 30 in stock
                 WRITE(12,420)PIDARR(L), REORDERAMOUNT
             END IF
         END IF
-
 420     FORMAT(I6.6, 1x, I2)
-        GO TO 300
-399     CLOSE(UNIT=3, STATUS='KEEP')
-        CLOSE(UNIT=10, STATUS='KEEP')
-        CLOSE(UNIT=11, STATUS='KEEP')
-        CLOSE(UNIT=12, STATUS='KEEP')
         END SUBROUTINE
-
-
-        PROGRAM ANTHONY
-        INTEGER       PID, STOCK, REORDERPOINT, I, PIDARR(24)
-        INTEGER       STOCKARR(24)
-        INTEGER       REORDERPOINTARR(24)
-        CHARACTER*24  PNAME, PNAMEARR(24)
-        REAL          PRICE, PRICEARR(24)
-
-        INTEGER       CID, J, CIDARR(10)
-        CHARACTER*24  CNAME, STREET, CITY, STATECOUNTRY
-        CHARACTER*24  CNAMEARR(10), STREETARR(10), CITYARR(10)
-        CHARACTER*24  STATECOUNTRYARR(10)
-        REAL	      DEBT, DEBTARR(10)
-
-        INTEGER       ORDERED
-        CHARACTER     SALECODE
-        REAL          GROSS, NET, DISCOUNT
-        INTEGER       REORDERAMOUNT, TEMPSTOCKVAR, TEMPREORDVAR           
-
-        CALL GETINVENTORY(PIDARR, STOCKARR, REORDERPOINTARR, 
-     +  PNAMEARR, PRICEARR)
-        CALL GETCUSTOMERS(CIDARR, CNAMEARR, STREETARR, CITYARR, 
-     +  STATECOUNTRYARR, DEBTARR)
-        CALL PROCESSTRANSACTIONS(PIDARR, CIDARR, STOCKARR,
-     +  REORDERPOINTARR, PRICEARR, DEBTARR, CNAMEARR,
-     +  STREETARR, CITYARR, PNAMEARR, STATECOUNTRYARR)
-        END PROGRAM
-
 c************************************************************************************
-c* check if acustomer number is valid or not
-c* if not valid, write error report consisting of:  customer number, product number,
-c* number ordered, and type of error (invalid customer number).
-c*        SUBROUTINE ISVALIDCUSTOMER(CIDARG, PIDARG, ORDEREDARG)
-c*        INTEGER CIDARG
-c*        INTEGER PIDARG
-c*        INTEGER ORDEREDARG
-c*        DO 500 I = 1, 10
-c*            IF(CIDARG .EQ. CIDARR(I)) Then
-c*                GO TO 599
-c*            ENDIF
-c*        GO TO 505  
-c*500     CONTINUE
-c*505     WRITE (10, 510)CIDARG, PIDARG, ORDEREDARG
-c*510     FORMAT (I5.5, 4x, I6.6, 4x, I2, 2x)
-c*599     RETURN
-c*        END
-c************************************************************************************
-c*  SUBROUTINE ISVALIDID(ID, IDARR, ARRSIZE, *, *)
-c*          Check if a customer id or product id is valid
-c*          Return default if valid and return on second dummy param if invalid
-c*            INTEGER ID
-c*            INTEGER ARRSIZE
-c*            INTEGER IDARR(ARRSIZE)
-c*
-c*            INTEGER I
-c*            
-c*            DO 1000 I = 1, ARRSIZE
-c*                IF(ID .EQ. IDARR(I)) THEN
-c*                    RETURN
-c*                END IF
-c*1000        CONTINUE
-c*            RETURN 1
-c*        END SUBROUTINE
-C************************************************************************************
